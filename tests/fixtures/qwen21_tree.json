@@ -1,0 +1,73 @@
+[
+ {
+  "type": "directory",
+  "path": "docs"
+ },
+ {
+  "type": "file",
+  "path": "README.md",
+  "size": 4000,
+  "oid": "0000000000000000000000000000000000000000"
+ },
+ {
+  "type": "file",
+  "path": "Qwen-Image-2.1-Turbo-Q4_K_M.gguf",
+  "size": 135,
+  "oid": "0000000000000000000000000000000000000000",
+  "lfs": {
+   "oid": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+   "size": 4900000000,
+   "pointerSize": 135
+  }
+ },
+ {
+  "type": "file",
+  "path": "Qwen-Image-2.1-Turbo-Q5_K_M.gguf",
+  "size": 135,
+  "oid": "0000000000000000000000000000000000000000",
+  "lfs": {
+   "oid": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+   "size": 5800000000,
+   "pointerSize": 135
+  }
+ },
+ {
+  "type": "file",
+  "path": "Qwen-Image-2.1-Turbo-Q8_0.gguf",
+  "size": 135,
+  "oid": "0000000000000000000000000000000000000000",
+  "lfs": {
+   "oid": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+   "size": 7590000000,
+   "pointerSize": 135
+  }
+ },
+ {
+  "type": "file",
+  "path": "Qwen-Image-2.1-Turbo-F16.gguf",
+  "size": 135,
+  "oid": "0000000000000000000000000000000000000000",
+  "lfs": {
+   "oid": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+   "size": 14200000000,
+   "pointerSize": 135
+  }
+ },
+ {
+  "type": "file",
+  "path": "Qwen-Image-2.1-Turbo-lora.safetensors",
+  "size": 135,
+  "oid": "0000000000000000000000000000000000000000",
+  "lfs": {
+   "oid": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+   "size": 200000000,
+   "pointerSize": 135
+  }
+ },
+ {
+  "type": "file",
+  "path": "docs/notes.txt",
+  "size": 100,
+  "oid": "0000000000000000000000000000000000000000"
+ }
+]

@@ -1,0 +1,52 @@
+[
+ {
+  "type": "file",
+  "path": "model_index.json",
+  "size": 600,
+  "oid": "0000000000000000000000000000000000000000"
+ },
+ {
+  "type": "file",
+  "path": "unet/diffusion_pytorch_model.safetensors",
+  "size": 135,
+  "oid": "0000000000000000000000000000000000000000",
+  "lfs": {
+   "oid": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+   "size": 10300000000,
+   "pointerSize": 135
+  }
+ },
+ {
+  "type": "file",
+  "path": "vae/diffusion_pytorch_model.safetensors",
+  "size": 135,
+  "oid": "0000000000000000000000000000000000000000",
+  "lfs": {
+   "oid": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+   "size": 335000000,
+   "pointerSize": 135
+  }
+ },
+ {
+  "type": "file",
+  "path": "text_encoder/model.safetensors",
+  "size": 135,
+  "oid": "0000000000000000000000000000000000000000",
+  "lfs": {
+   "oid": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+   "size": 246000000,
+   "pointerSize": 135
+  }
+ },
+ {
+  "type": "file",
+  "path": "sd_xl_base_1.0.safetensors",
+  "size": 135,
+  "oid": "0000000000000000000000000000000000000000",
+  "lfs": {
+   "oid": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+   "size": 6940000000,
+   "pointerSize": 135
+  }
+ }
+]

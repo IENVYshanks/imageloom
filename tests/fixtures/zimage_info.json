@@ -1,0 +1,8 @@
+{
+ "id": "leejet/Z-Image-Turbo-GGUF",
+ "gated": false,
+ "tags": [
+  "gguf",
+  "license:apache-2.0"
+ ]
+}

@@ -1,0 +1,26 @@
+name: Model or family request
+description: Ask for support of a new image model (or report a model that fails to add or run)
+labels: ["models"]
+body:
+  - type: input
+    id: url
+    attributes:
+      label: Hugging Face link
+      placeholder: "https://huggingface.co/owner/repo"
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: What happens when you paste it into "Add model"?
+      description: "Detected family, warnings, error text. `imageloom models add <url> --dry-run` prints the same plan."
+  - type: textarea
+    id: engine
+    attributes:
+      label: Does stable-diffusion.cpp support it?
+      description: Link to the sd.cpp docs or an issue showing the command line that works (flags, required companion files).
+  - type: textarea
+    id: hardware
+    attributes:
+      label: Your hardware, if you tested it
+      placeholder: "M2 Pro 32 GB, Q5_0, 1024x1024 in 190 s"

@@ -1,0 +1,16 @@
+# Windows-only packages of the desktop host (windows/app.py). Installed into the bundled Python by build_windows.sh
+# WITHOUT pip running on Windows: every line is fetched with `pip download --platform win_amd64 ... --no-deps`, so this list
+# must be complete, including dependencies. Checked against PyPI `requires_dist` of pywebview 6.2.1 for sys_platform == "win32":
+#   pywebview -> pythonnet, proxy_tools, bottle, typing_extensions
+#   pythonnet -> clr_loader -> cffi -> pycparser
+# (pywebview's pyobjc/Qt/GTK/CEF requirements are macOS/Linux/extras and are not needed for the WebView2 backend.)
+# core/requirements.txt (pillow, send2trash, vtracer) is installed the same way.
+pywebview==6.2.1
+pythonnet==3.2.1
+clr_loader==0.3.1
+cffi==2.1.1
+pycparser==3.11
+# proxy_tools publishes no wheel, only a 3 KB pure-Python sdist: build_windows.sh unpacks it without running setup.py
+proxy_tools==0.1.0
+bottle==0.13.4
+typing_extensions==4.16.0

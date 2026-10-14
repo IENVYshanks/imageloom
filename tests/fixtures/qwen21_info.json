@@ -1,0 +1,12 @@
+{
+ "id": "someone/Qwen-Image-2.1-Turbo-GGUF",
+ "gated": false,
+ "likes": 12,
+ "downloads": 3400,
+ "tags": [
+  "gguf",
+  "text-to-image",
+  "license:other",
+  "base_model:Qwen/Qwen-Image-2.1-Turbo"
+ ]
+}

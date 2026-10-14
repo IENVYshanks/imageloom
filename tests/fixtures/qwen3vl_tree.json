@@ -1,0 +1,30 @@
+[
+ {
+  "type": "file",
+  "path": "Qwen3VL-8B-Instruct-Q8_0.gguf",
+  "size": 135,
+  "oid": "0000000000000000000000000000000000000000",
+  "lfs": {
+   "oid": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+   "size": 8700000000,
+   "pointerSize": 135
+  }
+ },
+ {
+  "type": "file",
+  "path": "mmproj-Qwen3VL-8B-Instruct-F16.gguf",
+  "size": 135,
+  "oid": "0000000000000000000000000000000000000000",
+  "lfs": {
+   "oid": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+   "size": 1160000000,
+   "pointerSize": 135
+  }
+ },
+ {
+  "type": "file",
+  "path": "README.md",
+  "size": 900,
+  "oid": "0000000000000000000000000000000000000000"
+ }
+]

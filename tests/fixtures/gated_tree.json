@@ -1,0 +1,24 @@
+[
+ {
+  "type": "file",
+  "path": "flux1-dev.safetensors",
+  "size": 135,
+  "oid": "0000000000000000000000000000000000000000",
+  "lfs": {
+   "oid": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+   "size": 23800000000,
+   "pointerSize": 135
+  }
+ },
+ {
+  "type": "file",
+  "path": "ae.safetensors",
+  "size": 135,
+  "oid": "0000000000000000000000000000000000000000",
+  "lfs": {
+   "oid": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+   "size": 335000000,
+   "pointerSize": 135
+  }
+ }
+]

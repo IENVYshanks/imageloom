@@ -1,0 +1,11 @@
+{
+ "id": "stabilityai/stable-diffusion-xl-base-1.0",
+ "gated": false,
+ "likes": 6000,
+ "downloads": 1000000,
+ "tags": [
+  "diffusers",
+  "text-to-image",
+  "license:openrail++"
+ ]
+}

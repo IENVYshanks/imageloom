@@ -1,0 +1,24 @@
+[
+ {
+  "type": "file",
+  "path": "z_image_turbo-Q4_K.gguf",
+  "size": 135,
+  "oid": "0000000000000000000000000000000000000000",
+  "lfs": {
+   "oid": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+   "size": 3900000000,
+   "pointerSize": 135
+  }
+ },
+ {
+  "type": "file",
+  "path": "z_image_turbo-Q8_0.gguf",
+  "size": 135,
+  "oid": "0000000000000000000000000000000000000000",
+  "lfs": {
+   "oid": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+   "size": 7100000000,
+   "pointerSize": 135
+  }
+ }
+]

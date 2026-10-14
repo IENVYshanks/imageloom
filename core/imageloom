@@ -1,0 +1,711 @@
+#!/usr/bin/env python3
+"""imageloom: local image generation and editing CLI (stable-diffusion.cpp: Metal on macOS, Vulkan on Windows). Default model: Qwen-Image 2.1 Turbo Q8 without refusals.
+
+  imageloom "a red fox in snow, golden hour, 35mm photo"            create  -> prints the PNG path
+  imageloom "..." -r 16:9 -q standard -n 2 --json                    options
+  imageloom edit photo.jpg "make the sky a sunset" [-q standard]     edit an existing image (1-3 inputs: repeat -i)
+  imageloom upscale picture.png --to 4k [--model quality|fast|illustration]   AI upscale (ESRGAN family) to 2x / 4x / 2k / 4k / 8k
+  imageloom "a red fox logo" --transparent -o fox.png               transparent background (real alpha channel)
+  imageloom export picture.png --format webp|svg|png|jpeg [--preset logo] [-q 90] [-o out]   convert / vectorize
+  imageloom "..." --upscale 4k                                       create small, then upscale to 4K automatically
+  imageloom "..." -m z-image                                         pick an installed model (id or part of the name)
+  imageloom models                                                   list models;  `models use ID`, `models rm ID`
+  imageloom models add https://huggingface.co/owner/repo [--file F] download a new model from a Hugging Face link and register it
+  imageloom ui | status | stop | serve | doctor
+
+Talks to the local server (auto-started on demand). Stdout carries only results
+(file paths, or JSON with --json); progress and errors go to stderr.
+Times on a base M4 / 16 GB, create: fast (768 px) ~4 min, standard (1024 px) ~6.5 min, hq (1536 px) and max (2048 px) much longer.
+Edit uses smaller tiers (fast 512, standard 640, hq 768, max 1024 px) because it is far slower: 768 px took 20 min.
+"""
+from __future__ import annotations
+
+import argparse
+import json
+import math
+import os
+import shutil
+import struct
+import subprocess
+import sys
+import tempfile
+import time
+import urllib.error
+import urllib.parse
+import urllib.request
+import webbrowser
+from pathlib import Path
+
+import platform
+
+ROOT = Path(__file__).resolve().parent  # code (server.py lives next to this file)
+SYSTEM = platform.system()
+
+
+def default_data_dir() -> Path:
+    """Same rule as server.py: where models, history and settings live."""
+    env = os.environ.get("IMAGELOOM_HOME")
+    if env:
+        return Path(os.path.abspath(os.path.expanduser(env)))
+    if SYSTEM == "Darwin":
+        return Path.home() / "Library" / "Application Support" / "ImageLoom"
+    if SYSTEM == "Windows":
+        return Path(os.environ.get("LOCALAPPDATA", str(Path.home() / "AppData" / "Local"))) / "ImageLoom"
+    return Path(os.environ.get("XDG_DATA_HOME", str(Path.home() / ".local" / "share"))) / "imageloom"
+
+
+class CliError(Exception):
+    """A problem to report in one line (no traceback) with an exit code."""
+
+    def __init__(self, msg: str, code: int = 1):
+        super().__init__(msg)
+        self.code = code
+
+
+def eprint(*a, **k) -> None:
+    print(*a, file=sys.stderr, **k)
+
+
+DATA = default_data_dir()
+
+
+def load_config() -> dict:
+    try:
+        data = json.loads((DATA / "config.json").read_text(encoding="utf-8-sig"))
+        return data if isinstance(data, dict) else {}
+    except FileNotFoundError:
+        return {}
+    except (OSError, ValueError) as exc:
+        eprint(f"imageloom: ignoring the unreadable {DATA / 'config.json'} ({exc})")
+        return {}
+
+
+CONFIG = load_config()
+
+
+def discover_port() -> int:
+    """Use the running server's port (the desktop app may have picked another one), else the default."""
+    env = os.environ.get("IMAGELOOM_PORT")
+    if env:
+        if not env.isdigit():
+            sys.exit(f"imageloom: IMAGELOOM_PORT must be a port number, not {env!r}")
+        return int(env)
+    try:
+        return int(json.loads((DATA / "server.json").read_text(encoding="utf-8-sig"))["port"])
+    except Exception:  # noqa: BLE001
+        port = CONFIG.get("port", 7870)
+        return port if isinstance(port, int) else 7870
+
+
+PORT = discover_port()
+BASE = f"http://127.0.0.1:{PORT}"
+LOG_DIR = DATA / "logs"
+AREA = {"fast": 768 * 768, "standard": 1024 * 1024, "hq": 1536 * 1536, "max": 2048 * 2048}
+AREA_EDIT = {"fast": 512 * 512, "standard": 640 * 640, "hq": 768 * 768, "max": 1024 * 1024}  # editing doubles the sequence: smaller tiers
+MULT = 32  # Qwen-Image 2.1 needs dimensions divisible by 32
+HDR = {"X-ImageLoom": "1"}
+OPENER = urllib.request.build_opener(urllib.request.ProxyHandler({}))  # the server is on this machine: never via a proxy
+
+
+def call(path: str, body=None, timeout: float = 30, raw: bool = False, headers: dict | None = None):
+    if raw:
+        data, hdrs = body, {**HDR, "Content-Type": "application/octet-stream", **(headers or {})}
+    elif body is not None:
+        data, hdrs = json.dumps(body).encode(), {**HDR, "Content-Type": "application/json"}
+    else:
+        data, hdrs = None, dict(HDR)
+    req = urllib.request.Request(BASE + path, data=data, headers=hdrs, method="POST" if data is not None else "GET")
+    try:
+        with OPENER.open(req, timeout=timeout) as r:
+            return r.status, json.loads(r.read())
+    except urllib.error.HTTPError as exc:
+        try:
+            return exc.code, json.loads(exc.read())
+        except Exception:  # noqa: BLE001
+            return exc.code, {"error": exc.reason}
+
+
+def alive() -> bool:
+    try:
+        return call("/api/status", timeout=2)[0] == 200
+    except Exception:  # noqa: BLE001
+        return False
+
+
+def log_tail(n: int = 6) -> str:
+    try:
+        lines = (LOG_DIR / "server.log").read_text(encoding="utf-8", errors="replace").strip().splitlines()[-n:]
+        return "\n".join("  | " + ln for ln in lines)
+    except OSError:
+        return ""
+
+
+def ensure_server() -> None:
+    global PORT, BASE
+    if alive():
+        return
+    LOG_DIR.mkdir(parents=True, exist_ok=True)
+    log = open(LOG_DIR / "server.log", "ab")
+    proc = subprocess.Popen([sys.executable, str(ROOT / "server.py")], stdout=log, stderr=log, stdin=subprocess.DEVNULL,
+                            start_new_session=True, env={**os.environ, "IMAGELOOM_PORT": str(PORT)})
+    for _ in range(50):
+        try:  # the server moves to a free port when ours is taken: follow it
+            info = json.loads((DATA / "server.json").read_text(encoding="utf-8-sig"))
+            if info.get("pid") == proc.pid and info.get("port") != PORT:
+                PORT = int(info["port"])
+                BASE = f"http://127.0.0.1:{PORT}"
+        except Exception:  # noqa: BLE001
+            pass
+        if alive():
+            return
+        if proc.poll() is not None:
+            break
+        time.sleep(0.2)
+    if alive():  # (another instance won the race to start)
+        return
+    raise CliError(f"the server did not start (see {LOG_DIR / 'server.log'}):\n{log_tail()}")
+
+
+_OUT: list[Path] = []
+
+
+def out_dir() -> Path:
+    """The library folder, as the running server sees it."""
+    if not _OUT:
+        code, st = call("/api/status")
+        _OUT.append(Path(st["output_dir"] if code == 200 and st.get("output_dir") else CONFIG.get("output_dir") or Path.home() / "Pictures" / "ImageLoom").expanduser().resolve())
+    return _OUT[0]
+
+
+def preflight(need_models: bool = True) -> None:
+    """Say plainly what is missing before any work is done (engine, models)."""
+    st = call("/api/status")[1]
+    if not st.get("engine_found"):
+        raise CliError("the sd-cli engine is not installed yet. Run `imageloom ui` and use its setup screen to download it "
+                       "(`imageloom models add <hugging face link>` fetches it too), or point IMAGELOOM_SD_CLI at an existing sd-cli.", 2)
+    if need_models and st.get("setup_needed"):
+        raise CliError("no model is installed yet. Run `imageloom ui` for the setup screen (default model, about 17 GB) "
+                       "or `imageloom models add <hugging face link>`; `imageloom doctor` shows what is missing.", 2)
+
+
+def dims(ratio: str, quality: str, edit: bool = False) -> tuple[int, int]:
+    try:
+        a, b = (float(x) for x in ratio.split(":"))
+        if a <= 0 or b <= 0 or a / b > 50 or b / a > 50:
+            raise ValueError
+    except ValueError:
+        raise CliError(f"bad aspect ratio {ratio!r}: use something like 1:1, 4:3 or 16:9", 2) from None
+    area = (AREA_EDIT if edit else AREA)[quality]
+    w = math.sqrt(area * a / b)
+    h = w * b / a
+    snap = lambda v: max(512, int(round(v / MULT)) * MULT)  # noqa: E731
+    return snap(w), snap(h)
+
+
+def parse_size(text: str) -> tuple[int, int]:
+    try:
+        w, h = (int(x) for x in text.lower().split("x"))
+        return w, h
+    except ValueError:
+        raise CliError(f"bad size {text!r}: use WxH, for example 1024x768", 2) from None
+
+
+def png_size(path: Path) -> tuple[int, int]:
+    with open(path, "rb") as fh:
+        head = fh.read(24)
+    if len(head) < 24 or head[:8] != b"\x89PNG\r\n\x1a\n":
+        raise CliError(f"{path.name} is not a PNG picture", 1)
+    return struct.unpack(">II", head[16:24])
+
+
+def prepare_ref(src: Path, w: int | None, h: int | None, tmpdir: Path, idx: int) -> tuple[Path, int, int]:
+    """Convert any image to PNG (macOS `sips`, else Pillow); optionally resample to exactly w x h."""
+    out = tmpdir / f"ref{idx}.png"
+    src = src.resolve()  # absolute, so a file name that starts with '-' can never be read as an option
+    if shutil.which("sips"):
+        try:
+            subprocess.run(["sips", "-s", "format", "png", str(src), "--out", str(out)], capture_output=True, check=True)
+            if w and h:
+                subprocess.run(["sips", "-z", str(h), str(w), str(out)], capture_output=True, check=True)
+        except subprocess.CalledProcessError as exc:
+            raise CliError(f"cannot read {src.name} as a picture ({(exc.stdout or exc.stderr or b'').decode(errors='replace').strip()[:200] or 'sips failed'})", 2) from None
+    else:
+        try:
+            from PIL import Image
+        except ImportError:
+            raise CliError("converting pictures needs macOS `sips` or the Pillow package (pip install pillow)", 2) from None
+        try:
+            with Image.open(src) as im:
+                im = im.convert("RGBA" if im.mode in ("RGBA", "LA") else "RGB")
+                im.resize((w, h), Image.LANCZOS).save(out, "PNG") if w and h else im.save(out, "PNG")
+        except Exception as exc:  # noqa: BLE001
+            raise CliError(f"cannot read {src.name} as a picture ({exc})", 2) from None
+    if not out.exists():
+        raise CliError(f"cannot read {src.name} as a picture", 2)
+    return out, *png_size(out)
+
+
+def wait_job(job_id: str, label: str):
+    last_phase, last_line = "", ""
+    tty = sys.stderr.isatty()
+    while True:
+        time.sleep(1)
+        code, j = call(f"/api/jobs/{job_id}")
+        if code != 200:
+            raise CliError(f"lost track of job {job_id}: {j.get('error', code)} (did the server restart?)")
+        if j["status"] == "queued":
+            phase, line = "queued", f"queued (position {j.get('position', 1)})"
+        elif j["status"] == "running":
+            phase = j.get("phase", "working")
+            line = f"{phase} {j.get('step', 0)}/{j.get('steps', 8)}  {int(j.get('elapsed', 0))}s"
+        else:
+            break
+        if tty:
+            if line != last_line:
+                eprint("\r" + line.ljust(60), end="")
+        elif phase != last_phase:
+            eprint(f"{phase} ({int(j.get('elapsed', 0))}s)")
+        last_phase, last_line = phase, line
+    if tty:
+        eprint("\r" + " " * 60 + "\r", end="")
+    return j
+
+
+def finish(args, j, prompt: str, w: int, h: int) -> int:
+    if j["status"] != "done":
+        eprint("imageloom:", j.get("error") or j["status"])
+        return 1
+    lib = out_dir()
+    originals = [lib / f for f in j["images"]]
+    paths, total = originals, j["seconds"]
+    ups = []
+    for nid in j.get("next", []):  # chained auto-upscale
+        eprint("upscaling the result...")
+        uj = wait_job(nid, "upscale")
+        if uj["status"] == "done":
+            ups += [lib / f for f in uj["images"]]
+            total += uj["seconds"]
+        else:
+            eprint("imageloom: upscale failed:", uj.get("error") or uj["status"])
+    if ups:
+        paths = ups
+    elif j.get("error"):
+        eprint("imageloom:", j["error"])
+    return emit(args, paths, originals if ups else [], {"prompt": prompt, "width": w, "height": h, "seeds": j["seeds"], "seconds": round(total, 1), "peak_gb": j.get("peak_gb")})
+
+
+def emit(args, paths: list, originals: list, meta: dict) -> int:
+    if args.output:
+        dest = Path(args.output).expanduser()
+        moved = []
+        for i, p in enumerate(paths):
+            target = dest if len(paths) == 1 and dest.suffix else (
+                dest.with_name(f"{dest.stem}-{i + 1}{dest.suffix}") if dest.suffix else dest / p.name)
+            try:
+                target.parent.mkdir(parents=True, exist_ok=True)
+                shutil.copyfile(p, target)
+            except OSError as exc:
+                raise CliError(f"cannot write {target}: {exc.strerror or exc}") from None
+            moved.append(target)
+        paths = moved
+    if args.json:
+        out = {"images": [str(p.resolve()) for p in paths], **meta}
+        if originals:
+            out["originals"] = [str(p.resolve()) for p in originals]
+        print(json.dumps(out, ensure_ascii=False))
+    else:
+        for p in paths:
+            print(p.resolve())
+    eprint(f"done in {meta.get('seconds')}s")
+    if args.open:
+        opener = {"Darwin": "open", "Windows": None}.get(SYSTEM, "xdg-open")
+        for p in paths:
+            if opener is None:
+                os.startfile(p.resolve())  # type: ignore[attr-defined]  # noqa: S606
+            elif shutil.which(opener):
+                subprocess.run([opener, str(p.resolve())], check=False)  # absolute path: never taken for an option
+            else:
+                eprint(f"imageloom: cannot open {p}: no `{opener}` here")
+    return 0
+
+
+SELECTED: dict = {"model": None, "chat": None, "quality": None}
+
+
+def resolve_model(query: str | None, edit: bool) -> dict | None:
+    """Pick a model by id or by part of its name; without a query use the active model (edit: any model that can edit)."""
+    d = call("/api/models")[1]
+    models = d.get("models", [])
+    if query:
+        q = query.lower()
+        hit = [m for m in models if m["id"] == query] or [m for m in models if q in m["id"].lower() or q in m["name"].lower()]
+        if not hit:
+            eprint(f"imageloom: no model matches '{query}'. Installed: " + ", ".join(m["id"] for m in models))
+            return None
+        m = hit[0]
+    else:
+        m = next((x for x in models if x["id"] == d.get("active")), None) or next((x for x in models if x.get("ready")), None)
+        if edit and m and not m.get("can_edit"):
+            m = next((x for x in models if x.get("ready") and x.get("can_edit")), m)
+    if not m or not m.get("ready"):
+        eprint("imageloom: the model is not ready (" + (m["status"] if m else "none installed") + "); see `imageloom models` or `imageloom doctor`.")
+        return None
+    if edit and not m.get("can_edit"):
+        eprint(f"imageloom: {m['name']} cannot edit photos; use a model tagged 'edit' (see `imageloom models`).")
+        return None
+    return m
+
+
+def submit(body: dict, w: int, h: int, n: int, edit: bool):
+    ensure_server()
+    preflight()
+    st = call("/api/status")[1]
+    m = resolve_model(SELECTED["model"], edit)
+    if m is None:
+        return None
+    body["model"] = m["id"]
+    if SELECTED["quality"] is not None:
+        body["effort"] = SELECTED["quality"]
+    if SELECTED["chat"]:
+        body["chat"] = SELECTED["chat"]
+    est = call(f"/api/eta?w={w}&h={h}&n={n}&edit={1 if edit else 0}&model={m['id']}")[1].get("seconds", 0)
+    code, job = call("/api/generate", body)
+    if code != 202:
+        eprint("imageloom:", job.get("error", job))
+        return None
+    eprint(f"queued {w}x{h} x{n}{' (edit)' if edit else ''} with {m['name']}, expect ~{est / 60:.1f} min (job {job['id']})")
+    if w * h > st.get("warn_pixels", 1_100_000):
+        eprint("note: this size is heavy for a 16 GB Mac; close Xcode/Simulators to avoid swapping.")
+    return job
+
+
+def cmd_generate(args: argparse.Namespace) -> int:
+    w, h = parse_size(args.size) if args.size else dims(args.ratio, args.quality)
+    body = {"mode": "generate", "prompt": args.prompt, "width": w, "height": h, "count": args.count}
+    if args.seed is not None:
+        body["seed"] = args.seed
+    if args.upscale:
+        body["then"] = {"upscale": {"model": args.up_model, "target": args.upscale}}
+    if args.transparent:
+        body["transparent"] = True
+    job = submit(body, w, h, args.count, False)
+    if job is None:
+        return 2
+    return finish(args, wait_job(job["id"], "gen"), args.prompt, w, h)
+
+
+def cmd_edit(args: argparse.Namespace) -> int:
+    inputs = [Path(p).expanduser().resolve() for p in args.input]
+    for p in inputs:
+        if not p.is_file():
+            eprint(f"imageloom: input not found: {p}")
+            return 2
+    ensure_server()
+    preflight()
+    with tempfile.TemporaryDirectory() as td:
+        tmp = Path(td)
+        first, fw, fh = prepare_ref(inputs[0], None, None, tmp, 0)
+        if args.size:
+            w, h = parse_size(args.size)
+        else:  # keep the picture's aspect ratio at the chosen quality tier
+            w, h = dims(f"{fw}:{fh}", args.quality, edit=True)
+        refs = []
+        for i, src in enumerate(inputs):
+            path, _, _ = prepare_ref(src, w, h, tmp, i)
+            code, row = call("/api/upload?name=" + urllib.parse.quote(src.name), path.read_bytes(), raw=True)
+            if code != 200:
+                eprint("imageloom: upload failed:", row.get("error", row))
+                return 1
+            refs.append(row["file"])
+    body = {"mode": "edit", "prompt": args.prompt, "width": w, "height": h, "count": args.count, "refs": refs}
+    if args.seed is not None:
+        body["seed"] = args.seed
+    if args.upscale:
+        body["then"] = {"upscale": {"model": args.up_model, "target": args.upscale}}
+    if args.transparent:
+        body["transparent"] = True
+    job = submit(body, w, h, args.count, True)
+    if job is None:
+        return 2
+    return finish(args, wait_job(job["id"], "edit"), args.prompt, w, h)
+
+
+def cmd_upscale(args: argparse.Namespace) -> int:
+    src = Path(args.image).expanduser().resolve()
+    if not src.is_file():
+        eprint(f"imageloom: input not found: {src}")
+        return 2
+    ensure_server()
+    preflight(need_models=False)
+    lib = out_dir()
+    if lib in src.parents and src.suffix.lower() == ".png":
+        rel = src.relative_to(lib).as_posix()
+    else:  # outside the library (or not a PNG): convert with sips and upload
+        with tempfile.TemporaryDirectory() as td:
+            png, _, _ = prepare_ref(src, None, None, Path(td), 0)
+            code, row = call("/api/upload?name=" + urllib.parse.quote(src.name), png.read_bytes(), raw=True, timeout=120)
+        if code != 200:
+            eprint("imageloom: upload failed:", row.get("error", row))
+            return 1
+        rel = row["file"]
+    sw, sh = png_size(lib / rel)
+    code, est = call(f"/api/eta?mode=upscale&w={sw}&h={sh}&model={args.model}&target={args.to}")
+    if code != 200:
+        eprint("imageloom:", est.get("error", est))
+        return 1
+    code, job = call("/api/generate", {"mode": "upscale", "src": rel, "model": args.model, "target": args.to})
+    if code != 202:
+        eprint("imageloom:", job.get("error", job))
+        return 1
+    eprint(f"queued upscale {sw}x{sh} -> {est['out_w']}x{est['out_h']} ({args.model}), expect ~{est['seconds'] / 60:.1f} min (job {job['id']})")
+    j = wait_job(job["id"], "upscale")
+    if j["status"] != "done":
+        eprint("imageloom:", j.get("error") or j["status"])
+        return 1
+    return emit(args, [lib / f for f in j["images"]], [], {"width": est["out_w"], "height": est["out_h"], "model": args.model, "target": args.to, "seconds": j["seconds"]})
+
+
+def cmd_export(args: argparse.Namespace) -> int:
+    src = Path(args.image).expanduser().resolve()
+    if not src.is_file():
+        eprint(f"imageloom: input not found: {src}")
+        return 2
+    ensure_server()
+    lib = out_dir()
+    if lib in src.parents:
+        rel = src.relative_to(lib).as_posix()
+    else:  # outside the library: upload it first
+        with tempfile.TemporaryDirectory() as td:
+            png, _, _ = prepare_ref(src, None, None, Path(td), 0)
+            code, row = call("/api/upload?name=" + urllib.parse.quote(src.name), png.read_bytes(), raw=True, timeout=120)
+        if code != 200:
+            eprint("imageloom: upload failed:", row.get("error", row))
+            return 1
+        rel = row["file"]
+    code, r = call("/api/export", {"file": rel, "format": args.format, "quality": args.quality, "preset": args.preset, "lossless": args.lossless, "max_side": args.max_side}, timeout=300)
+    if code != 200:
+        eprint("imageloom:", r.get("error", r))
+        return 1
+    return emit(args, [lib / r["file"]], [], {k: r[k] for k in ("format", "bytes", "width", "height", "paths") if k in r})
+
+
+def fmt_gb(n: float) -> str:
+    return f"{n / 1e9:.1f} GB"
+
+
+def cmd_models(argv: list) -> int:
+    p = argparse.ArgumentParser(prog="imageloom models", description="List, add (from a Hugging Face link), select and remove image models.")
+    sp = p.add_subparsers(dest="cmd")
+    sp.add_parser("list", help="show installed models (default)")
+    a = sp.add_parser("add", help="inspect a Hugging Face repo URL, download the chosen weights plus what they need, register the model")
+    a.add_argument("url", help="https://huggingface.co/owner/repo (or owner/repo)")
+    a.add_argument("--file", help="weights file to download (default: the best one that fits a 16 GB Mac)")
+    a.add_argument("--family", help="override the detected family (see `imageloom models add URL --dry-run`)")
+    a.add_argument("--variant", help="turbo / base / schnell / dev")
+    a.add_argument("--name", help="display name")
+    a.add_argument("--dry-run", action="store_true", help="only show what would be downloaded")
+    a.add_argument("--no-wait", action="store_true", help="return immediately; progress shows in `imageloom models`")
+    u = sp.add_parser("use", help="make a model the default"); u.add_argument("id")
+    r = sp.add_parser("rm", help="remove a downloaded model (files go to the Trash)"); r.add_argument("id")
+    args = p.parse_args(argv)
+    ensure_server()
+    if args.cmd in (None, "list"):
+        d = call("/api/models")[1]
+        for m in d["models"]:
+            flags = ", ".join(x for x in [("edit" if m.get("can_edit") else ""), ("alpha" if m.get("caps", {}).get("alpha") else ""), ("experimental" if m.get("experimental") else "")] if x)
+            mark = "*" if m["id"] == d.get("active") else " "
+            state = m["status"] if m.get("ready") or m["status"] != "ready" else "files missing"  # (the built-in entry says "ready" even before its download)
+            print(f"{mark} {m['id']:<28} {state:<13} {fmt_gb(m.get('size', 0)):>8}  {m['name']}" + (f"  [{flags}]" if flags else ""))
+        print(f"\nfree disk: {fmt_gb(d.get('free_bytes', 0))}   (* = default)")
+        return 0
+    if args.cmd == "use":
+        code, r = call("/api/models/active", {"id": args.id})
+        if code != 200:
+            eprint("imageloom:", r.get("error", r))
+            return 1
+        print(f"default model: {args.id}")
+        return 0
+    if args.cmd == "rm":
+        code, r = call("/api/models/delete", {"id": args.id})
+        if code != 200:
+            eprint("imageloom:", r.get("error", r))
+            return 1
+        print(f"removed {args.id}")
+        return 0
+    code, pl = call("/api/models/inspect", {"url": args.url}, timeout=90)
+    if code != 200:
+        eprint("imageloom:", pl.get("error", pl))
+        return 1
+    file = args.file or pl["default"]
+    cand = next((c for c in pl["candidates"] if c["path"] == file or c["path"].split("/")[-1] == file), None)
+    if cand is None:
+        eprint("imageloom: choose --file from: " + ", ".join(f"{c['path']} ({fmt_gb(c['size'])})" for c in pl["candidates"]))
+        return 1
+    fam = args.family or pl["family"]
+    eprint(f"{pl['name']}: family {fam}{' (experimental: untested recipe)' if pl.get('experimental') else ''}, license {pl.get('license') or '?'}")
+    eprint(f"  weights {cand['path']} {fmt_gb(cand['size'])}" + "".join(f"\n  + {c['label']} {fmt_gb(c['size'])}" for c in pl["companions"]))
+    if not call("/api/status")[1].get("engine_found"):
+        eprint("  + sd-cli engine ~35 MB (not installed yet: downloaded first, the model turns ready after both)")
+    for w in pl.get("warnings", []):
+        eprint("  warning:", w)
+    if args.dry_run:
+        return 0
+    code, r = call("/api/models/add", {"repo": pl["repo"], "family": fam, "variant": args.variant or pl["variant"], "file": cand["path"], "name": args.name or pl["name"]}, timeout=90)
+    if code != 200:
+        eprint("imageloom:", r.get("error", r))
+        return 1
+    if args.no_wait:
+        return 0
+    mid = next((m["id"] for m in r["models"] if m["status"] == "downloading"), None)
+    last = -1.0
+    while mid:
+        time.sleep(2)
+        m = next((x for x in call("/api/models")[1]["models"] if x["id"] == mid), None)
+        if not m or m["status"] != "downloading":
+            break
+        dl = (m.get("downloading") or {}).values()
+        tot, got = sum(x["total"] for x in dl), sum(x["bytes"] for x in dl)
+        if tot and got / tot - last > 0.02:
+            last = got / tot
+            eprint(f"  downloading {got / tot * 100:.0f}%  {fmt_gb(got)} / {fmt_gb(tot)}")
+    m = next((x for x in call("/api/models")[1]["models"] if x["id"] == mid), None) if mid else None
+    if mid and (not m or not m.get("ready")):
+        eprint("imageloom: download failed:", "; ".join(f"{k}: {v['error']}" for k, v in ((m or {}).get("downloading") or {}).items() if v.get("error")) or "unknown error")
+        return 1
+    print(mid or "ok")
+    return 0
+
+
+def cmd_status(_: argparse.Namespace) -> int:
+    if not alive():
+        print("server: stopped")
+    else:
+        print(json.dumps(call("/api/status")[1], indent=2, ensure_ascii=False))
+    return 0
+
+
+def cmd_stop(_: argparse.Namespace) -> int:
+    if not alive():
+        print("server: not running")
+        return 0
+    call("/api/quit", {})
+    print("server stopped")
+    return 0
+
+
+def cmd_serve(_: argparse.Namespace) -> int:
+    os.execv(sys.executable, [sys.executable, str(ROOT / "server.py")])
+
+
+def cmd_ui(_: argparse.Namespace) -> int:
+    ensure_server()
+    webbrowser.open(BASE)
+    print(BASE)
+    return 0
+
+
+def cmd_doctor(_: argparse.Namespace) -> int:
+    ok = True
+    exe = "sd-cli.exe" if SYSTEM == "Windows" else "sd-cli"
+    sd = next((p for p in [DATA / "sd" / "bin" / exe, DATA / "engine" / exe, ROOT.parent / "engine" / exe] if p.exists()), DATA / "engine" / exe)
+    hint = "MISSING (the app's setup screen, or `imageloom models add`, downloads it)"
+    print(f"sd-cli engine:  {'OK' if sd.exists() else hint}  {sd}")
+    ok &= sd.exists()
+    models = DATA / "models" / "qwen21-turbo-q8-uncensored"
+    for label, rel, need, required in [
+        ("denoiser Q8", "Qwen-Image-2.1-Turbo-Q8_0.gguf", 7.5e9, True),
+        ("encoder Q8 (no refusals)", "Qwen-Image-2.1-Turbo-Abliterated-Uncensored-Q8_0.gguf", 8.6e9, True),
+        ("VAE", "vae/qwen_image_2.1_vae_bf16.safetensors", 0.6e9, True),
+        ("vision (editing)", "mmproj-Qwen-Image-2.1-Turbo-Abliterated-Uncensored-F16.gguf", 1.1e9, False),
+    ]:
+        f = models / rel
+        good = f.is_file() and f.stat().st_size >= need
+        size = f"{f.stat().st_size / 1e9:.2f} GB" if f.exists() else "absent"
+        print(f"{label:<25} {'OK' if good else 'MISSING/INCOMPLETE'}  {size}  {rel}")
+        ok &= good or not required
+    for label, rel in [("upscaler quality", "RealESRGAN_x4plus.pth"), ("upscaler fast", "4xNomos2_hq_mosr.pth"), ("upscaler illustration", "RealESRGAN_x4plus_anime_6B.pth")]:
+        f = DATA / "models" / "upscale" / rel
+        print(f"{label:<25} {'OK' if f.is_file() and f.stat().st_size > 5e6 else 'MISSING (upscale unavailable)'}  {rel}")
+    print(f"server:         {'running' if alive() else 'stopped (auto-starts on demand)'}  {BASE}")
+    print(f"free disk:      {shutil.disk_usage(Path.home()).free / 1e9:.0f} GB")
+    return 0 if ok else 1
+
+
+def run(argv: list) -> int:
+    subs = {"ui": cmd_ui, "status": cmd_status, "stop": cmd_stop, "serve": cmd_serve, "doctor": cmd_doctor}
+    if argv and argv[0] in subs:
+        return subs[argv[0]](argparse.Namespace())
+    common = argparse.ArgumentParser(add_help=False)
+    common.add_argument("-q", "--quality", choices=list(AREA), default="fast",
+                        help="fast=~768px (~4 min), standard=~1024px (~7 min), hq=~1536px, max=~2048px (long; heavy on 16 GB). Default fast")
+    common.add_argument("-s", "--size", help=f"exact WxH, both divisible by {MULT}, 512..2752, width*height <= 2048*2048")
+    common.add_argument("-n", "--count", type=int, default=1, help="number of images from one model load (1-8; edit 1-4)")
+    common.add_argument("--seed", type=int, help="fixed seed for reproducibility")
+    common.add_argument("-o", "--output", help="also copy the result to this file (or directory)")
+    common.add_argument("--json", action="store_true", help="print one JSON object instead of bare paths")
+    common.add_argument("--open", action="store_true", help="open the result in Preview")
+    common.add_argument("--upscale", choices=["2x", "4x", "2k", "4k", "8k"], help="after creating/editing, AI-upscale the result to this target (e.g. 4k = 3840 px on the long side)")
+    common.add_argument("--transparent", action="store_true", help="transparent background: the model draws a real alpha channel (use PNG or WebP output)")
+    common.add_argument("-m", "--model", help="model id or part of its name (see `imageloom models`); default = the model chosen in the app")
+    common.add_argument("--chat", help="put the result into this chat id of the Studio app (default: the archive)")
+    common.add_argument("--up-model", choices=["quality", "fast", "illustration"], default="quality", help="upscaler for --upscale (default quality)")
+    if argv and argv[0] == "models":
+        return cmd_models(argv[1:])
+    if argv and argv[0] == "export":
+        p = argparse.ArgumentParser(prog="imageloom export", description="Convert an image to PNG / WebP / JPEG, or trace it into an SVG (vector). Transparency is kept for PNG, WebP and SVG.")
+        p.add_argument("image", help="input image")
+        p.add_argument("--format", "-f", default="webp", choices=["png", "webp", "jpeg", "svg"])
+        p.add_argument("--quality", "-q", type=int, default=90, help="WebP/JPEG quality 50-100 (default 90)")
+        p.add_argument("--lossless", action="store_true", help="WebP: lossless")
+        p.add_argument("--preset", default="logo", choices=["logo", "illustration", "detailed", "bw"], help="SVG tracing preset (default logo: few colours, clean shapes)")
+        p.add_argument("--max-side", type=int, default=0, help="resize so the long side is at most this many px (SVG default 1536)")
+        p.add_argument("-o", "--output", help="also copy the result to this file (or directory)")
+        p.add_argument("--json", action="store_true")
+        p.add_argument("--open", action="store_true")
+        return cmd_export(p.parse_args(argv[1:]))
+    if argv and argv[0] == "upscale":
+        p = argparse.ArgumentParser(prog="imageloom upscale", description="AI-upscale an existing image (Real-ESRGAN family, runs on the GPU in seconds to minutes).")
+        p.add_argument("image", help="input image (any format macOS can read)")
+        p.add_argument("--to", default="4k", choices=["2x", "4x", "2k", "4k", "8k"], help="target: 2x / 4x of the input, or long side 2560 / 3840 / 7680 px (default 4k)")
+        p.add_argument("--model", default="quality", choices=["quality", "fast", "illustration"], help="quality = Real-ESRGAN x4plus (clean, ~4 min per megapixel), fast = Nomos2 (~40 s per megapixel, may show a weave pattern in smooth skies), illustration = anime_6B")
+        p.add_argument("-o", "--output", help="also copy the result to this file (or directory)")
+        p.add_argument("--json", action="store_true")
+        p.add_argument("--open", action="store_true")
+        return cmd_upscale(p.parse_args(argv[1:]))
+    if argv and argv[0] == "edit":
+        p = argparse.ArgumentParser(prog="imageloom edit", parents=[common],
+                                    description="Edit an image with an instruction. Output keeps the picture's aspect ratio.")
+        p.add_argument("image", help="input image (any format macOS can read)")
+        p.add_argument("prompt", help="what to change, e.g. 'replace the sky with a dramatic sunset'")
+        p.add_argument("-i", "--also", action="append", default=[], help="extra reference image (up to 2 more)")
+        a = p.parse_args(argv[1:])
+        a.input = [a.image, *a.also]
+        SELECTED.update(model=a.model, chat=a.chat, quality=list(AREA).index(a.quality))
+        return cmd_edit(a)
+    p = argparse.ArgumentParser(prog="imageloom", parents=[common], description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
+    p.add_argument("prompt", help="image description (be specific; quote exact text you want rendered)")
+    p.add_argument("-r", "--ratio", default="1:1", help="aspect ratio, e.g. 1:1 4:3 3:4 16:9 9:16 3:2 (default 1:1)")
+    a = p.parse_args(argv)
+    SELECTED.update(model=a.model, chat=a.chat, quality=list(AREA).index(a.quality))
+    return cmd_generate(a)
+
+
+def main() -> int:
+    try:
+        return run(sys.argv[1:])
+    except CliError as exc:
+        eprint(f"imageloom: {exc}")
+        return exc.code
+    except KeyboardInterrupt:
+        eprint("\nimageloom: interrupted. A job that is already queued keeps running in the server (`imageloom stop` quits it).")
+        return 130
+    except (urllib.error.URLError, ConnectionError, TimeoutError) as exc:
+        eprint(f"imageloom: cannot reach the server at {BASE} ({getattr(exc, 'reason', exc)}). Start it with `imageloom ui` or `imageloom serve`.")
+        return 1
+    except json.JSONDecodeError:
+        eprint(f"imageloom: the server at {BASE} sent an unexpected answer. Is something else using that port?")
+        return 1
+
+
+if __name__ == "__main__":
+    sys.exit(main())

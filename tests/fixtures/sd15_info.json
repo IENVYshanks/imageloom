@@ -1,0 +1,8 @@
+{
+ "id": "runwayml/stable-diffusion-v1-5",
+ "gated": false,
+ "tags": [
+  "diffusers",
+  "license:creativeml-openrail-m"
+ ]
+}

@@ -1,0 +1,24 @@
+# build output and caches
+/dist/
+/.build/
+/.cache/
+/.venv/
+/.ruff_cache/
+__pycache__/
+*.pyc
+.DS_Store
+
+# local data that must never be committed: models, history, tokens, logs
+*.gguf
+*.safetensors
+*.pth
+*.part
+history.jsonl
+config.json
+models.json
+chats.json
+.env
+.env.*
+*.log
+*.pem
+*.key

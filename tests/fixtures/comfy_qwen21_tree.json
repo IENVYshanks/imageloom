@@ -1,0 +1,24 @@
+[
+ {
+  "type": "file",
+  "path": "vae/qwen_image_2.1_vae_bf16.safetensors",
+  "size": 135,
+  "oid": "0000000000000000000000000000000000000000",
+  "lfs": {
+   "oid": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+   "size": 675509688,
+   "pointerSize": 135
+  }
+ },
+ {
+  "type": "file",
+  "path": "split_files/diffusion_models/x.safetensors",
+  "size": 135,
+  "oid": "0000000000000000000000000000000000000000",
+  "lfs": {
+   "oid": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+   "size": 20000000000,
+   "pointerSize": 135
+  }
+ }
+]

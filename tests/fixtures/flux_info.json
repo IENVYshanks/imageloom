@@ -1,0 +1,11 @@
+{
+ "id": "city96/FLUX.1-dev-gguf",
+ "gated": false,
+ "likes": 900,
+ "downloads": 90000,
+ "tags": [
+  "gguf",
+  "text-to-image",
+  "license:other"
+ ]
+}

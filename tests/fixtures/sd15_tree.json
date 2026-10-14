@@ -1,0 +1,24 @@
+[
+ {
+  "type": "file",
+  "path": "v1-5-pruned-emaonly.safetensors",
+  "size": 135,
+  "oid": "0000000000000000000000000000000000000000",
+  "lfs": {
+   "oid": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+   "size": 4269999999,
+   "pointerSize": 135
+  }
+ },
+ {
+  "type": "file",
+  "path": "v1-5-pruned.safetensors",
+  "size": 135,
+  "oid": "0000000000000000000000000000000000000000",
+  "lfs": {
+   "oid": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+   "size": 7700000000,
+   "pointerSize": 135
+  }
+ }
+]

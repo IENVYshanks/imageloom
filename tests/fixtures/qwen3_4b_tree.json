@@ -1,0 +1,13 @@
+[
+ {
+  "type": "file",
+  "path": "Qwen3-4B-Instruct-2507-Q4_K_M.gguf",
+  "size": 135,
+  "oid": "0000000000000000000000000000000000000000",
+  "lfs": {
+   "oid": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+   "size": 2500000000,
+   "pointerSize": 135
+  }
+ }
+]

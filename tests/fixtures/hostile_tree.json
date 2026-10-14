@@ -1,0 +1,79 @@
+[
+ {
+  "type": "file",
+  "path": "../../evil-Q4_0.gguf",
+  "size": 135,
+  "oid": "0000000000000000000000000000000000000000",
+  "lfs": {
+   "oid": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+   "size": 2000000000,
+   "pointerSize": 135
+  }
+ },
+ {
+  "type": "file",
+  "path": "/etc/cron.d/evil-Q4_0.gguf",
+  "size": 135,
+  "oid": "0000000000000000000000000000000000000000",
+  "lfs": {
+   "oid": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+   "size": 2000000000,
+   "pointerSize": 135
+  }
+ },
+ {
+  "type": "file",
+  "path": "sub/../../up-Q4_0.gguf",
+  "size": 135,
+  "oid": "0000000000000000000000000000000000000000",
+  "lfs": {
+   "oid": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+   "size": 2000000000,
+   "pointerSize": 135
+  }
+ },
+ {
+  "type": "file",
+  "path": "back\\slash-Q4_0.gguf",
+  "size": 135,
+  "oid": "0000000000000000000000000000000000000000",
+  "lfs": {
+   "oid": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+   "size": 2000000000,
+   "pointerSize": 135
+  }
+ },
+ {
+  "type": "file",
+  "path": "nul\u0000byte-Q4_0.gguf",
+  "size": 135,
+  "oid": "0000000000000000000000000000000000000000",
+  "lfs": {
+   "oid": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+   "size": 2000000000,
+   "pointerSize": 135
+  }
+ },
+ {
+  "type": "file",
+  "path": "./dot-Q4_0.gguf",
+  "size": 135,
+  "oid": "0000000000000000000000000000000000000000",
+  "lfs": {
+   "oid": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+   "size": 2000000000,
+   "pointerSize": 135
+  }
+ },
+ {
+  "type": "file",
+  "path": "good-model-Q4_0.gguf",
+  "size": 135,
+  "oid": "0000000000000000000000000000000000000000",
+  "lfs": {
+   "oid": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+   "size": 2000000000,
+   "pointerSize": 135
+  }
+ }
+]

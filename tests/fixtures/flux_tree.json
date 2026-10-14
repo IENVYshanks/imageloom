@@ -1,0 +1,74 @@
+[
+ {
+  "type": "file",
+  "path": "flux1-dev-Q2_K.gguf",
+  "size": 135,
+  "oid": "0000000000000000000000000000000000000000",
+  "lfs": {
+   "oid": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+   "size": 4000000000,
+   "pointerSize": 135
+  }
+ },
+ {
+  "type": "file",
+  "path": "flux1-dev-Q4_0.gguf",
+  "size": 135,
+  "oid": "0000000000000000000000000000000000000000",
+  "lfs": {
+   "oid": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+   "size": 6800000000,
+   "pointerSize": 135
+  }
+ },
+ {
+  "type": "file",
+  "path": "flux1-dev-Q4_K_S.gguf",
+  "size": 135,
+  "oid": "0000000000000000000000000000000000000000",
+  "lfs": {
+   "oid": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+   "size": 6800000000,
+   "pointerSize": 135
+  }
+ },
+ {
+  "type": "file",
+  "path": "flux1-dev-Q5_K_S.gguf",
+  "size": 135,
+  "oid": "0000000000000000000000000000000000000000",
+  "lfs": {
+   "oid": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+   "size": 8300000000,
+   "pointerSize": 135
+  }
+ },
+ {
+  "type": "file",
+  "path": "flux1-dev-Q6_K.gguf",
+  "size": 135,
+  "oid": "0000000000000000000000000000000000000000",
+  "lfs": {
+   "oid": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+   "size": 9900000000,
+   "pointerSize": 135
+  }
+ },
+ {
+  "type": "file",
+  "path": "flux1-dev-Q8_0.gguf",
+  "size": 135,
+  "oid": "0000000000000000000000000000000000000000",
+  "lfs": {
+   "oid": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+   "size": 12700000000,
+   "pointerSize": 135
+  }
+ },
+ {
+  "type": "file",
+  "path": "README.md",
+  "size": 500,
+  "oid": "0000000000000000000000000000000000000000"
+ }
+]

@@ -1,0 +1,13 @@
+[
+ {
+  "type": "file",
+  "path": "split_files/vae/ae.safetensors",
+  "size": 135,
+  "oid": "0000000000000000000000000000000000000000",
+  "lfs": {
+   "oid": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+   "size": 335000000,
+   "pointerSize": 135
+  }
+ }
+]

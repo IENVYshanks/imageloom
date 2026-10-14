@@ -1,0 +1,57 @@
+name: Bug report
+description: Something does not work as expected
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for taking the time! Please search existing issues first. For security problems use **Security → Report a vulnerability** instead.
+  - type: dropdown
+    id: os
+    attributes:
+      label: Operating system
+      options: ["macOS (Apple Silicon)", "Windows 10/11", "Linux", "Other"]
+    validations:
+      required: true
+  - type: input
+    id: hardware
+    attributes:
+      label: Chip / GPU and RAM
+      placeholder: "Apple M4, 16 GB  /  RTX 3060 12 GB, 32 GB"
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: ImageLoom version
+      description: "App → About, or `imageloom status`"
+      placeholder: "1.0.0"
+    validations:
+      required: true
+  - type: dropdown
+    id: how
+    attributes:
+      label: How do you run it?
+      options: ["Desktop app (DMG / installer)", "Portable zip", "From source (python3 core/server.py)", "CLI only"]
+  - type: input
+    id: model
+    attributes:
+      label: Model and size
+      placeholder: "Qwen-Image 2.1 Turbo Q8, 768x768, create"
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened?
+      description: What did you expect, and what did you see instead? Screenshots welcome.
+    validations:
+      required: true
+  - type: textarea
+    id: repro
+    attributes:
+      label: Steps to reproduce
+  - type: textarea
+    id: logs
+    attributes:
+      label: Log excerpt
+      description: "Last lines of `logs/server.log` in the data folder (macOS: ~/Library/Application Support/ImageLoom, Windows: %LOCALAPPDATA%\\ImageLoom). Remove anything private."
+      render: text

@@ -1,0 +1,125 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>ImageLoom: a local AI image studio for Mac and Windows</title>
+<meta name="description" content="Chat with your own image model. Create, edit with a brush, upscale to 4K and export transparent PNG, WebP or SVG. Free, open source, offline: no cloud, no account.">
+<link rel="canonical" href="https://elapen.github.io/imageloom/">
+<meta property="og:type" content="website">
+<meta property="og:title" content="ImageLoom: a local AI image studio for Mac and Windows">
+<meta property="og:description" content="Create, edit with a brush, upscale to 4K, export SVG/WebP/transparent PNG. Free, open source, offline.">
+<meta property="og:image" content="https://elapen.github.io/imageloom/images/banner.png">
+<meta property="og:url" content="https://elapen.github.io/imageloom/">
+<meta name="twitter:card" content="summary_large_image">
+<link rel="icon" href="images/icon-64.png">
+<script type="application/ld+json">
+{"@context":"https://schema.org","@type":"SoftwareApplication","name":"ImageLoom","applicationCategory":"MultimediaApplication","operatingSystem":"macOS, Windows",
+ "description":"Local AI image studio: create, edit, upscale and export images offline with stable-diffusion.cpp.","offers":{"@type":"Offer","price":"0","priceCurrency":"USD"},
+ "license":"https://opensource.org/licenses/MIT","url":"https://elapen.github.io/imageloom/","codeRepository":"https://github.com/elapen/imageloom"}
+</script>
+<style>
+  :root { --bg:#f7f7f5; --panel:#fff; --ink:#1b1b1f; --muted:#62626b; --line:#e4e4df; --accent:#4a5cff; --accent-soft:#e9ecff; }
+  @media (prefers-color-scheme: dark) { :root { --bg:#111114; --panel:#1b1b20; --ink:#f1f1f3; --muted:#a2a2ad; --line:#2c2c34; --accent:#7b88ff; --accent-soft:#23264a; } }
+  * { box-sizing:border-box; } html { scroll-behavior:smooth; }
+  body { margin:0; background:var(--bg); color:var(--ink); font:16px/1.6 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
+  a { color:var(--accent); } img { max-width:100%; height:auto; display:block; }
+  .wrap { max-width:1040px; margin:0 auto; padding:0 20px; }
+  nav { display:flex; align-items:center; gap:18px; padding:16px 0; } nav b { font-size:18px; letter-spacing:-.01em; margin-right:auto; display:flex; align-items:center; gap:10px; }
+  nav img { width:30px; height:30px; border-radius:8px; } nav a { color:var(--muted); text-decoration:none; font-size:14px; } nav a:hover { color:var(--ink); }
+  .hero { text-align:center; padding:48px 0 28px; } .hero h1 { font-size:clamp(34px,6vw,58px); line-height:1.08; letter-spacing:-.03em; margin:0 0 16px; }
+  .hero p { font-size:clamp(17px,2.4vw,21px); color:var(--muted); max-width:720px; margin:0 auto 26px; }
+  .btns { display:flex; gap:12px; justify-content:center; flex-wrap:wrap; }
+  .btn { display:inline-flex; align-items:center; gap:8px; padding:12px 20px; border-radius:12px; font-weight:600; text-decoration:none; border:1px solid var(--line); background:var(--panel); color:var(--ink); }
+  .btn.primary { background:var(--accent); border-color:var(--accent); color:#fff; } .btn:hover { filter:brightness(.97); }
+  .small { font-size:13px; color:var(--muted); margin-top:12px; }
+  .shot { margin:34px auto 0; border-radius:18px; overflow:hidden; border:1px solid var(--line); box-shadow:0 30px 80px rgba(20,20,40,.22); }
+  section { padding:54px 0 6px; } h2 { font-size:clamp(26px,4vw,36px); letter-spacing:-.02em; margin:0 0 8px; } .lead { color:var(--muted); margin:0 0 26px; max-width:700px; }
+  .grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(280px,1fr)); gap:16px; }
+  .card { background:var(--panel); border:1px solid var(--line); border-radius:16px; padding:20px; } .card h3 { margin:0 0 6px; font-size:18px; } .card p { margin:0; color:var(--muted); font-size:15px; }
+  .gallery { display:grid; grid-template-columns:repeat(auto-fit,minmax(220px,1fr)); gap:12px; } .gallery img { border-radius:14px; border:1px solid var(--line); width:100%; aspect-ratio:1; object-fit:cover; }
+  table { width:100%; border-collapse:collapse; background:var(--panel); border:1px solid var(--line); border-radius:14px; overflow:hidden; font-size:15px; }
+  th, td { text-align:left; padding:11px 14px; border-bottom:1px solid var(--line); } th { color:var(--muted); font-weight:600; font-size:13px; text-transform:uppercase; letter-spacing:.05em; } tr:last-child td { border-bottom:0; }
+  code { background:var(--accent-soft); padding:2px 6px; border-radius:6px; font-size:.92em; } pre { background:var(--panel); border:1px solid var(--line); border-radius:14px; padding:16px; overflow:auto; font-size:14px; }
+  details { background:var(--panel); border:1px solid var(--line); border-radius:12px; padding:14px 18px; margin:10px 0; } summary { cursor:pointer; font-weight:600; }
+  footer { padding:46px 0 60px; color:var(--muted); font-size:14px; text-align:center; }
+  .scroll { overflow-x:auto; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <nav><b><img src="images/icon-64.png" alt="">ImageLoom</b><a href="#features">Features</a><a href="#download">Download</a><a href="#models">Models</a><a href="https://github.com/elapen/imageloom">GitHub</a></nav>
+
+  <header class="hero">
+    <h1>Your own AI image studio.<br>On your computer.</h1>
+    <p>Chat with an image model: create, edit with a brush, upscale to 4K and export transparent PNG, WebP or SVG. Free and open source. No cloud, no account, no Python setup.</p>
+    <div class="btns">
+      <a class="btn primary" href="https://github.com/elapen/imageloom/releases/latest">Download for macOS</a>
+      <a class="btn" href="https://github.com/elapen/imageloom/releases/latest">Windows (experimental)</a>
+      <a class="btn" href="https://github.com/elapen/imageloom">★ Star on GitHub</a>
+    </div>
+    <div class="small">macOS 13+ on Apple Silicon (16 GB RAM recommended) · MIT license · every image on this page was generated locally with ImageLoom</div>
+    <div class="shot"><video src="images/demo.mp4" poster="images/showcase-chat.png" autoplay muted loop playsinline controls preload="metadata" width="1040" style="display:block;width:100%;height:auto" aria-label="ImageLoom tour: chat, model and effort pickers, add a model from a link, gallery"></video></div>
+  </header>
+
+  <section id="features">
+    <h2>Everything in one place</h2>
+    <p class="lead">From the first prompt to a 4K, transparent or vector file, without leaving the window.</p>
+    <div class="grid">
+      <div class="card"><h3>Chat-style workflow</h3><p>Separate chats, each with its own model and effort level. The result of one message becomes the starting photo of the next.</p></div>
+      <div class="card"><h3>Edit with a brush</h3><p>Paint a mask, say what should change. Only the edited pixels are pasted back into your full-resolution original.</p></div>
+      <div class="card"><h3>Upscale to 4K and beyond</h3><p>×2, ×4, 2K, 4K or 8K with Real-ESRGAN, or chain it after every render: 512 px draft now, 4K a minute later.</p></div>
+      <div class="card"><h3>PNG · WebP · JPEG · SVG</h3><p>Real transparent backgrounds and vector tracing for logos, icons and flat art, exported in one click.</p></div>
+      <div class="card"><h3>New model by link</h3><p>Paste a Hugging Face URL. ImageLoom detects the family, picks a file that fits, downloads what it needs and adds it to the picker.</p></div>
+      <div class="card"><h3>Private and light</h3><p>Native window, about 160 MB without models, a local server that starts and stops with the app. No telemetry, no account.</p></div>
+      <div class="card"><h3>CLI and AI-agent skills</h3><p><code>imageloom "a red fox in snow" --upscale 4k</code>, plus ready-made skills for Claude Code, Cursor and Hermes.</p></div>
+      <div class="card"><h3>Honest estimates</h3><p>Time estimates come from timings measured on your own machine, and say "estimate" until a model has been timed.</p></div>
+    </div>
+  </section>
+
+  <section>
+    <h2>Made with ImageLoom</h2>
+    <p class="lead">Qwen-Image 2.1 Turbo and Z-Image Turbo, rendered on a base MacBook (M4, 16 GB).</p>
+    <div class="gallery">
+      <img src="images/g-cabin.jpg" alt="Wooden cabin in a snowy forest at blue hour" loading="lazy">
+      <img src="images/g-sneakers.jpg" alt="Studio product photo of white sneakers" loading="lazy">
+      <img src="images/g-isometric.jpg" alt="Isometric home office" loading="lazy">
+      <img src="images/g-watercolor.jpg" alt="Watercolor lighthouse at sunrise" loading="lazy">
+      <img src="images/g-poster.jpg" alt="Vintage Swiss Alps travel poster with lettering" loading="lazy">
+      <img src="images/g-fox.jpg" alt="Fox logo with transparent background" loading="lazy">
+    </div>
+  </section>
+
+  <section id="download">
+    <h2>Download</h2>
+    <p class="lead">The first-run wizard lists everything it will download (engine, default model about 18 GB, upscalers) before it starts. After that the app works offline.</p>
+    <div class="scroll"><table>
+      <tr><th>Platform</th><th>Get it</th><th>Notes</th></tr>
+      <tr><td><b>macOS</b> (Apple Silicon)</td><td><a href="https://github.com/elapen/imageloom/releases/latest">DMG</a> · <code>brew install --cask elapen/tap/imageloom</code></td><td>Not notarized: right-click → Open the first time.</td></tr>
+      <tr><td><b>Windows</b> 10/11 x64</td><td><a href="https://github.com/elapen/imageloom/releases/latest">Setup.exe or portable zip</a></td><td>Experimental: built on a Mac, not yet run on real Windows. Needs Vulkan. SmartScreen will warn.</td></tr>
+      <tr><td><b>From source</b></td><td><code>pip install -r core/requirements.txt &amp;&amp; python3 core/server.py</code></td><td>Python 3.9+, open http://127.0.0.1:7870.</td></tr>
+    </table></div>
+  </section>
+
+  <section id="models">
+    <h2>Models</h2>
+    <p class="lead">Powered by <a href="https://github.com/leejet/stable-diffusion.cpp">stable-diffusion.cpp</a> (Metal on Mac, Vulkan on Windows).</p>
+    <div class="scroll"><table>
+      <tr><th>Model</th><th>Create</th><th>Edit</th><th>Transparent</th><th>Status</th></tr>
+      <tr><td>Qwen-Image 2.1 Turbo (Q8, default)</td><td>yes</td><td>yes</td><td>yes</td><td>verified on M4 16 GB</td></tr>
+      <tr><td>Z-Image Turbo (Q4_K)</td><td>yes</td><td>no</td><td>no</td><td>verified on M4 16 GB</td></tr>
+      <tr><td>FLUX.1 · SDXL · SD 1.5</td><td>yes</td><td>no</td><td>no</td><td>experimental recipes</td></tr>
+    </table></div>
+  </section>
+
+  <section>
+    <h2>Questions</h2>
+    <details><summary>Is it really offline?</summary><p>Yes. The network is used only for downloads you trigger (models from Hugging Face, the engine from GitHub). Prompts and images never leave your computer, and there is no telemetry.</p></details>
+    <details><summary>How fast is it?</summary><p>On a base M4 with 16 GB: a 768 px image takes about 4 minutes with Qwen-Image or 2.5 minutes with Z-Image. The best workflow is a small draft, then upscale the keeper to 4K.</p></details>
+    <details><summary>Is there a content filter?</summary><p>No. Diffusion models have none and the default text encoder has its refusal behaviour removed, so you are responsible for what you create and share. See the README for the responsible-use notes.</p></details>
+    <details><summary>Can I use commercial results?</summary><p>That depends on each model's license; the default Qwen weights are research / non-commercial, Z-Image is Apache-2.0. ImageLoom's own code is MIT.</p></details>
+  </section>
+</div>
+<footer>MIT licensed · <a href="https://github.com/elapen/imageloom">github.com/elapen/imageloom</a> · <a href="https://github.com/elapen/imageloom/discussions">Discussions</a> · <a href="https://github.com/elapen/imageloom/issues">Issues</a></footer>
+</body>
+</html>
